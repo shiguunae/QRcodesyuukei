@@ -169,6 +169,43 @@
   }
   .tab.active{ background:var(--accent2, var(--pink)); color:#0a0a13; border-color:transparent; font-weight:700; }
 
+  .mini-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:14px 0 6px; }
+  @media (max-width:640px){ .mini-stats{ grid-template-columns:repeat(2,1fr); } }
+  .mini-stat{ background:var(--bg-soft); border:1px solid var(--card-border); border-radius:12px; padding:11px 13px; }
+  .mini-stat .k{ font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .mini-stat .v{ font-family:'Zen Kaku Gothic New',sans-serif; font-weight:900; font-size:19px; color:var(--text); line-height:1.25; }
+  .mini-stat .v small{ font-size:11px; font-weight:500; color:var(--muted); margin-left:2px; }
+  .mini-stat .s{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .list-controls{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:6px; }
+  .seg{ display:flex; gap:6px; }
+  .seg .tab{ padding:6px 12px; }
+  .search-input{ flex:1; min-width:170px; background:var(--bg-soft); color:var(--text); border:1px solid var(--card-border); border-radius:999px; padding:8px 14px; font-size:13px; font-family:inherit; }
+  .search-input:focus{ outline:1px solid var(--pink); }
+  details.month-group{ border:1px solid var(--card-border); border-radius:12px; margin-top:10px; background:rgba(255,255,255,0.015); }
+  details.month-group > summary{ list-style:none; cursor:pointer; padding:12px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  details.month-group > summary::-webkit-details-marker{ display:none; }
+  details.month-group > summary::before{ content:'▸'; color:var(--pink); font-size:12px; transition:transform .15s; }
+  details.month-group[open] > summary::before{ transform:rotate(90deg); }
+  .grp-title{ font-family:'Zen Kaku Gothic New',sans-serif; font-weight:700; font-size:15px; }
+  .grp-meta{ font-size:12px; color:var(--muted); margin-left:auto; }
+  .grp-meta b{ color:var(--cyan); }
+  .grp-body{ padding:2px 14px 12px; }
+  .item-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid rgba(255,255,255,0.05); font-size:13px; }
+  .item-main{ flex:1; min-width:0; }
+  .item-name{ line-height:1.45; word-break:break-all; }
+  .item-sub{ font-size:11px; color:var(--muted2); margin-top:2px; word-break:break-all; line-height:1.5; }
+  .item-row .bar-track{ width:64px; flex:none; min-width:0; }
+  .item-count{ min-width:38px; text-align:right; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums; }
+  .open-all{ font-size:12px; color:var(--muted); background:none; border:1px solid var(--card-border); border-radius:999px; padding:5px 12px; cursor:pointer; margin-top:10px; }
+  .more-btn{ display:block; margin:14px auto 0; font-size:12.5px; color:var(--text); background:var(--bg-soft); border:1px solid var(--card-border); border-radius:999px; padding:8px 18px; cursor:pointer; }
+  .empty-note{ color:var(--muted); font-size:13px; padding:18px 0; text-align:center; }
+  .tbl-scroll{ overflow-x:auto; margin-top:14px; -webkit-overflow-scrolling:touch; }
+  .tbl-scroll table{ min-width:560px; }
+  .tbl-scroll td.num, .tbl-scroll th.num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .tbl-scroll .pos{ color:var(--green); font-weight:700; } .tbl-scroll .neg{ color:var(--pink); font-weight:700; }
+  .tbl-scroll .dim{ color:var(--muted2); }
+  .tbl-scroll td:first-child, .tbl-scroll th:first-child{ white-space:nowrap; }
+
   .month-select{
     background:var(--bg-soft); color:var(--text); border:1px solid var(--card-border);
     border-radius:10px; padding:8px 12px; font-size:13px; font-family:inherit; cursor:pointer;
@@ -239,6 +276,21 @@
     <div class="chart-box" style="height:340px;">
       <canvas id="monthlyChart"></canvas>
     </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="--accent:var(--pink)"></span>掲載一覧（店舗・QR枠ごとの読み込み数）</h2>
+    <div class="desc">カテゴリを選ぶと、どのお店が何月号に掲載され、何回読み込まれたかを確認できます。</div>
+    <div class="tabbar" id="listCatTabs"></div>
+    <div class="list-controls">
+      <div class="seg" id="listViewSeg">
+        <button class="tab active" data-view="month">月号別</button>
+        <button class="tab" data-view="store">店舗別（累計）</button>
+      </div>
+      <input class="search-input" id="listSearch" type="search" placeholder="店名・QR枠名で検索">
+    </div>
+    <div class="mini-stats" id="listSummary"></div>
+    <div id="listBody"></div>
   </div>
 
   <div class="grid2">
@@ -338,6 +390,123 @@ DATA.categories.forEach((c,i)=>{
   chipsEl.appendChild(btn);
 });
 renderMonthlyChart(DATA.categories.filter(c=>activeCatSet.has(c)));
+
+// ---- 掲載一覧: which store/QR slot appeared in which issue, with counts ----
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cleanName = s => {
+  const c = s.replace(/^\d{4}(?:企画)?[_＿]?\s*/,'').replace(/^\d{1,2}月号(?:企画|ビフォーアフター[＿_]?)/,'').trim();
+  return c || s;
+};
+const listEntries = [];
+DATA.months_full.forEach(lab => (DATA.month_items[lab] || []).forEach(it => {
+  listEntries.push({ month: lab, cat: it.category, item: it.item, name: cleanName(it.item), count: it.count });
+}));
+
+let listCat = DATA.categories.includes('編集企画') ? '編集企画' : 'ALL';
+let listView = 'month';
+let listQuery = '';
+let listShowAll = false;
+
+function catColor(c){ const i = DATA.categories.indexOf(c); return i>=0 ? NEON[i%NEON.length] : '#928dab'; }
+function nameBlock(name, orig){
+  return `<div class="item-name">${esc(name)}</div>` + (orig !== name ? `<div class="item-sub">${esc(orig)}</div>` : '');
+}
+function catTag(c){ return listCat==='ALL' ? `<span class="cat-tag" style="margin-right:6px; border-color:${catColor(c)}66; color:${catColor(c)};">${esc(c)}</span>` : ''; }
+
+function renderList(){
+  const q = listQuery.trim().toLowerCase();
+  const rows = listEntries.filter(e =>
+    (listCat==='ALL' || e.cat===listCat) &&
+    (!q || e.name.toLowerCase().includes(q) || e.item.toLowerCase().includes(q)));
+
+  const total = rows.reduce((s,e)=>s+e.count,0);
+  const monthsSet = new Set(rows.map(e=>e.month));
+  const label = listCat==='ALL' ? 'すべて' : listCat;
+  document.getElementById('listSummary').innerHTML = `
+    <div class="mini-stat"><div class="k">対象</div><div class="v" style="font-size:15px;">${esc(label)}${q ? '<small>「'+esc(listQuery.trim())+'」</small>' : ''}</div></div>
+    <div class="mini-stat"><div class="k">掲載号数</div><div class="v">${monthsSet.size}<small>号</small></div></div>
+    <div class="mini-stat"><div class="k">QR枠数（延べ）</div><div class="v">${rows.length}<small>枠</small></div></div>
+    <div class="mini-stat"><div class="k">合計読み込み数</div><div class="v">${total.toLocaleString()}<small>回</small></div></div>`;
+
+  const body = document.getElementById('listBody');
+  if(!rows.length){ body.innerHTML = '<div class="empty-note">該当するQR枠がありません。</div>'; return; }
+
+  if(listView === 'month'){
+    const latest = DATA.months_full.slice().reverse().find(m => monthsSet.has(m));
+    const groups = DATA.months_full.slice().reverse().filter(m => monthsSet.has(m)).map(m => {
+      const its = rows.filter(e=>e.month===m).sort((a,b)=>b.count-a.count);
+      const sub = its.reduce((s,e)=>s+e.count,0);
+      const max = Math.max(...its.map(e=>e.count),1);
+      const open = (m===latest || q) ? ' open' : '';
+      return `<details class="month-group"${open}>
+        <summary><span class="grp-title">${esc(m)}号</span><span class="grp-meta">${its.length}枠 ／ 合計 <b>${sub.toLocaleString()}回</b></span></summary>
+        <div class="grp-body">${its.map(e=>`
+          <div class="item-row">
+            <div class="item-main">${catTag(e.cat)}${nameBlock(e.name, e.item)}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.round(e.count/max*100)}%"></div></div>
+            <div class="item-count">${e.count.toLocaleString()}</div>
+          </div>`).join('')}
+        </div>
+      </details>`;
+    }).join('');
+    body.innerHTML = `<button class="open-all" id="toggleAll">すべて開く／閉じる</button>${groups}`;
+    document.getElementById('toggleAll').onclick = () => {
+      const ds = body.querySelectorAll('details.month-group');
+      const anyClosed = Array.from(ds).some(d=>!d.open);
+      ds.forEach(d=>d.open = anyClosed);
+    };
+  } else {
+    const map = new Map();
+    rows.forEach(e => {
+      const k = e.cat + '|' + e.name;
+      if(!map.has(k)) map.set(k, { name:e.name, cat:e.cat, orig:e.item, total:0, apps:[] });
+      const o = map.get(k); o.total += e.count; o.apps.push({ month:e.month, count:e.count });
+    });
+    const stores = Array.from(map.values()).sort((a,b)=>b.total-a.total);
+    const max = Math.max(...stores.map(s=>s.total),1);
+    const LIMIT = 30;
+    const shown = listShowAll ? stores : stores.slice(0, LIMIT);
+    body.innerHTML = `<div style="margin-top:8px;">` + shown.map((s,i)=>`
+      <div class="item-row">
+        <span class="rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</span>
+        <div class="item-main">${catTag(s.cat)}${nameBlock(s.name, s.apps.length===1 ? s.orig : s.name)}
+          <div class="item-sub">${s.apps.slice().reverse().map(a=>esc(a.month)+'号 '+a.count.toLocaleString()+'回').join(' ／ ')}</div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.total/max*100)}%"></div></div>
+        <div class="item-count">${s.total.toLocaleString()}</div>
+      </div>`).join('') + `</div>` +
+      (stores.length > LIMIT ? `<button class="more-btn" id="moreBtn">${listShowAll ? '上位'+LIMIT+'件のみ表示' : '全'+stores.length+'件を表示'}</button>` : '');
+    const mb = document.getElementById('moreBtn');
+    if(mb) mb.onclick = () => { listShowAll = !listShowAll; renderList(); };
+  }
+}
+
+// controls
+(function(){
+  const tabs = document.getElementById('listCatTabs');
+  const opts = [{v:'ALL', label:'すべて', color:'#f3f1fb'}].concat(DATA.categories.map(c=>({v:c, label:c, color:catColor(c)})));
+  opts.forEach(o=>{
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (o.v===listCat ? ' active' : '');
+    btn.innerHTML = `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${o.color};margin-right:6px;vertical-align:middle;"></i>${esc(o.label)}`;
+    btn.onclick = () => {
+      listCat = o.v; listShowAll = false;
+      tabs.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderList();
+    };
+    tabs.appendChild(btn);
+  });
+  document.querySelectorAll('#listViewSeg .tab').forEach(btn=>{
+    btn.onclick = () => {
+      listView = btn.dataset.view; listShowAll = false;
+      document.querySelectorAll('#listViewSeg .tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderList();
+    };
+  });
+  document.getElementById('listSearch').addEventListener('input', e => { listQuery = e.target.value; listShowAll = false; renderList(); });
+  renderList();
+})();
 
 // ---- ad trend chart with tabs ----
 let adChart;

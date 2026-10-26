@@ -273,6 +273,18 @@
   .edit-row .input{ padding:7px 9px; font-size:13px; }
   @media (max-width:720px){ .edit-row{ grid-template-columns:1fr 90px 38px; } .edit-row .e-cat{ grid-column:1 / -1; } }
   .edit-row .del{ width:38px; height:34px; border-radius:9px; border:1px solid #f0b8b3; background:#fff; color:#b42318; cursor:pointer; font-size:15px; }
+  .carry-card .carry-row{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:9px 0; border-top:1px solid var(--line); font-size:14px; }
+  .carry-card .carry-row:first-child{ border-top:0; }
+  .carry-card .carry-row .nm{ word-break:break-all; } .carry-card .carry-row .v{ font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .carry-edit{ display:grid; grid-template-columns:1fr 96px 38px; gap:8px; align-items:center; padding:6px 0; border-top:1px solid var(--line); }
+  .carry-edit .input{ padding:7px 9px; font-size:13px; }
+  .carry-edit .del{ width:38px; height:34px; border-radius:9px; border:1px solid #f0b8b3; background:#fff; color:#b42318; cursor:pointer; font-size:15px; }
+  .agg-filter{ margin:0 0 6px; max-width:320px; }
+  .agg-row{ display:grid; grid-template-columns:1fr 120px 70px 90px; gap:8px; align-items:center; padding:7px 0; border-top:1px solid var(--line); font-size:13px; }
+  .agg-row.head{ color:var(--muted); font-size:12px; border-top:0; font-weight:600; }
+  .agg-row .nm{ word-break:break-all; } .agg-row .ct{ color:var(--muted); font-size:12px; }
+  .agg-row .num{ text-align:right; font-variant-numeric:tabular-nums; } .agg-row .tot{ font-weight:700; }
+  @media (max-width:720px){ .agg-row{ grid-template-columns:1fr 60px 80px; } .agg-row .ct{ display:none; } }
   .edit-row .del:hover{ background:#fdeceb; }
   .ed-help{ font-size:13px; color:var(--muted); line-height:1.8; margin-bottom:10px; }
   .paste-opts{ margin:10px 0; font-size:13px; }
@@ -354,6 +366,12 @@
     </div>
   </div>
 
+  <div class="card carry-card" id="carryCard" hidden>
+    <h2><span class="dot" style="--accent:var(--green)"></span><span id="carryTitle">前月までの累計</span></h2>
+    <div class="desc" id="carryDesc">表紙・純広告などの固定枠の、前月号までの累計読み込み数です（Excelの合計欄の数値）。</div>
+    <div id="carryList"></div>
+  </div>
+
   <div class="card" style="border-color:rgba(14,116,144,0.28);">
     <h2><span class="dot" style="--accent:var(--cyan)"></span><span id="analysisTitle">この期間のポイント</span></h2>
     <div id="analysisList"></div>
@@ -430,6 +448,7 @@
     <div class="tabbar" id="editorTabs">
       <button class="tab active" data-tab="entry" type="button">入力・編集</button>
       <button class="tab" data-tab="paste" type="button">Excelから貼り付け</button>
+      <button class="tab" data-tab="carry" type="button">累計（前月まで）</button>
       <button class="tab" data-tab="publish" type="button">公開・バックアップ</button>
     </div>
 
@@ -466,6 +485,7 @@
       <div class="hint" id="edItemHint" style="margin-top:8px; min-height:18px;"></div>
       <div class="form-error" id="entryError" role="alert"></div>
       <div class="ed-subhead"><b id="edMonthTitle"></b><span id="edMonthSummary"></span></div>
+      <input class="input agg-filter" id="edAggFilter" placeholder="枠名で絞り込み" hidden aria-label="枠名で絞り込み">
       <div id="edRows"></div>
     </section>
 
@@ -479,6 +499,23 @@
         <button class="btn primary" id="pasteApply" type="button" disabled>登録する</button>
       </div>
       <div id="pastePreview"></div>
+    </section>
+
+    <!-- 累計（前月まで） -->
+    <section id="tab-carry" class="ed-tab" hidden>
+      <p class="hint" style="margin:0 0 10px;">Excelの「前月までの純広告合計読み込み数」欄にある数値を、そのまま入力・更新できます。トップ画面の「前月までの累計」に表示されます。月ごとの入力データとは別に管理されます。</p>
+      <div class="entry-form" style="display:block;">
+        <label class="field-label" for="carryLabel">時点（例：8/24）</label>
+        <input class="input" id="carryLabel" maxlength="20" style="max-width:200px;">
+      </div>
+      <div class="ed-subhead"><b>項目と累計読み込み数</b></div>
+      <div id="carryRows"></div>
+      <form class="entry-form" id="carryForm" autocomplete="off" style="margin-top:10px;">
+        <div class="field grow"><label class="field-label" for="carryItem">項目名</label><input class="input" id="carryItem" list="carryItemList" maxlength="120" placeholder="例：すすきのFreeC　表紙QRコード【固定】"><datalist id="carryItemList"></datalist></div>
+        <div class="field"><label class="field-label" for="carryN">累計</label><input class="input" id="carryN" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div>
+        <button class="btn primary" type="submit">＋ 追加</button>
+      </form>
+      <div class="form-error" id="carryError" role="alert"></div>
     </section>
 
     <!-- 公開・バックアップ -->
@@ -515,7 +552,7 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script id="seed-data" type="application/json">{"version":1,"updatedAt":"2026-10-26T10:30:00+09:00","rows":[{"y":2025,"m":7,"c":"ビフォアフ","i":"7月号ビフォーアフター＿ELIZABETH","n":10},{"y":2025,"m":7,"c":"目次","i":"snack K＿目次","n":8},{"y":2025,"m":7,"c":"ビフォアフ","i":"7月号ビフォーアフター＿Girls Bar Mint","n":6},{"y":2025,"m":7,"c":"ビフォアフ","i":"7月号ビフォーアフター＿Strawberry Jam","n":5},{"y":2025,"m":8,"c":"目次","i":"スナック欒＿目次","n":10},{"y":2025,"m":8,"c":"ビフォアフ","i":"8月号ビフォーアフター＿はなはな","n":6},{"y":2025,"m":8,"c":"ビフォアフ","i":"8月号ビフォーアフター＿トー横","n":4},{"y":2025,"m":8,"c":"ビフォアフ","i":"8月号ビフォーアフター＿Attesa","n":3},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画ぴよるんぱ（深夜営業店）","n":30},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画天竺（深夜営業店）","n":15},{"y":2025,"m":9,"c":"目次","i":"アリストパレス目次","n":14},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画flatto（深夜営業店）","n":13},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画蜂屋（深夜営業店）","n":8},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画めるてぃ（深夜営業店）","n":8},{"y":2025,"m":9,"c":"ビフォアフ","i":"9月号ビフォーアフター＿ラルカジエデン","n":7},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画しゃらら（深夜営業店）","n":7},{"y":2025,"m":9,"c":"ビフォアフ","i":"9月号ビフォーアフター＿NINE","n":3},{"y":2025,"m":9,"c":"ビフォアフ","i":"9月号ビフォーアフター＿DANDELION","n":3},{"y":2025,"m":10,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":29},{"y":2025,"m":10,"c":"編集企画","i":"0920企画焙煎舎","n":13},{"y":2025,"m":10,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":11},{"y":2025,"m":10,"c":"編集企画","i":"0920企画緋AKA","n":10},{"y":2025,"m":10,"c":"編集企画","i":"0920企画明かり家","n":10},{"y":2025,"m":10,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":9},{"y":2025,"m":10,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":8},{"y":2025,"m":10,"c":"編集企画","i":"0920企画一馬","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画嶋や","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画桜井製麵所","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画soba青","n":7},{"y":2025,"m":10,"c":"目次","i":"JOJO目次","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画すすきの軒","n":6},{"y":2025,"m":10,"c":"編集企画","i":"0920企画辛いち","n":6},{"y":2025,"m":10,"c":"編集企画","i":"0920企画すずらん","n":5},{"y":2025,"m":10,"c":"ビフォアフ","i":"10月号ビフォーアフター＿Attesa","n":2},{"y":2025,"m":10,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":2},{"y":2025,"m":10,"c":"ビフォアフ","i":"10月号ビフォーアフター＿CLUBLILY","n":1},{"y":2025,"m":10,"c":"ビフォアフ","i":"10月号ビフォーアフター＿PLEDGE","n":1},{"y":2025,"m":10,"c":"純広告","i":"アソビアン","n":0},{"y":2025,"m":11,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":24},{"y":2025,"m":11,"c":"編集企画","i":"1020企画しょんぴいケーキ","n":13},{"y":2025,"m":11,"c":"編集企画","i":"1020企画茶寮","n":6},{"y":2025,"m":11,"c":"編集企画","i":"1020企画いっぺこっぺ","n":6},{"y":2025,"m":11,"c":"編集企画","i":"1020企画クリム","n":5},{"y":2025,"m":11,"c":"編集企画","i":"1020企画サンタクリーム","n":5},{"y":2025,"m":11,"c":"編集企画","i":"ちょこっと寿司別邸","n":5},{"y":2025,"m":11,"c":"編集企画","i":"1020企画たこキング","n":5},{"y":2025,"m":11,"c":"編集企画","i":"1020企画しげぱん","n":4},{"y":2025,"m":11,"c":"ビフォアフ","i":"11月号ビフォーアフター＿めるれっと","n":4},{"y":2025,"m":11,"c":"目次","i":"attesa目次","n":4},{"y":2025,"m":11,"c":"ビフォアフ","i":"11月号ビフォーアフター＿CATCH","n":3},{"y":2025,"m":11,"c":"ビフォアフ","i":"11月号ビフォーアフター＿サザンクロス","n":2},{"y":2025,"m":11,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":2},{"y":2025,"m":11,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":1},{"y":2025,"m":11,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2025,"m":11,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":0},{"y":2025,"m":11,"c":"純広告","i":"アソビアン","n":0},{"y":2025,"m":12,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":36},{"y":2025,"m":12,"c":"編集企画","i":"彩ノ匠","n":13},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店囲","n":10},{"y":2025,"m":12,"c":"編集企画","i":"nendo","n":8},{"y":2025,"m":12,"c":"編集企画","i":"かわ屋","n":8},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店3号店","n":7},{"y":2025,"m":12,"c":"営業企画","i":"大黒屋1号店","n":7},{"y":2025,"m":12,"c":"編集企画","i":"五坪忍亭","n":7},{"y":2025,"m":12,"c":"編集企画","i":"唐韻","n":7},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店2号店","n":6},{"y":2025,"m":12,"c":"営業企画","i":"焼鳥と海鮮しん","n":6},{"y":2025,"m":12,"c":"編集企画","i":"俺流","n":6},{"y":2025,"m":12,"c":"営業企画","i":"平塚ジンギスカン","n":5},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店本店","n":5},{"y":2025,"m":12,"c":"編集企画","i":"ダパイダン","n":5},{"y":2025,"m":12,"c":"目次","i":"LECIA","n":5},{"y":2025,"m":12,"c":"営業企画","i":"すすきのジンギスカン","n":4},{"y":2025,"m":12,"c":"営業企画","i":"ジンギスカン羊師","n":3},{"y":2025,"m":12,"c":"営業企画","i":"北海しゃぶしゃぶ","n":3},{"y":2025,"m":12,"c":"営業企画","i":"しゃぶ平","n":3},{"y":2025,"m":12,"c":"営業企画","i":"大黒屋2号店","n":3},{"y":2025,"m":12,"c":"営業企画","i":"大黒屋3号店","n":3},{"y":2025,"m":12,"c":"営業企画","i":"いさざ和","n":2},{"y":2025,"m":12,"c":"ビフォアフ","i":"にゅ～かまっく","n":2},{"y":2025,"m":12,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":2},{"y":2025,"m":12,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":1},{"y":2025,"m":12,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2025,"m":12,"c":"ビフォアフ","i":"グランシャリオ","n":0},{"y":2025,"m":12,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":0},{"y":2025,"m":12,"c":"純広告","i":"アソビアン","n":0},{"y":2026,"m":1,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":55},{"y":2026,"m":1,"c":"編集企画","i":"パープルダリア","n":21},{"y":2026,"m":1,"c":"編集企画","i":"ロジウラカフェ","n":16},{"y":2026,"m":1,"c":"編集企画","i":"BerryGarden","n":15},{"y":2026,"m":1,"c":"編集企画","i":"パフェ佐藤","n":14},{"y":2026,"m":1,"c":"編集企画","i":"SABO","n":13},{"y":2026,"m":1,"c":"目次","i":"CLUBLILY","n":13},{"y":2026,"m":1,"c":"編集企画","i":"たぬきクレープ","n":12},{"y":2026,"m":1,"c":"編集企画","i":"ネモちゃんランド3","n":10},{"y":2026,"m":1,"c":"編集企画","i":"ミルク村","n":9},{"y":2026,"m":1,"c":"編集企画","i":"MUA","n":8},{"y":2026,"m":1,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":7},{"y":2026,"m":1,"c":"編集企画","i":"RiQ","n":6},{"y":2026,"m":1,"c":"編集企画","i":"市川茶屋","n":6},{"y":2026,"m":1,"c":"ビフォアフ","i":"JOJO","n":6},{"y":2026,"m":1,"c":"ビフォアフ","i":"サザンクロス","n":6},{"y":2026,"m":1,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":5},{"y":2026,"m":2,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":108},{"y":2026,"m":2,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":17},{"y":2026,"m":2,"c":"編集企画","i":"コロポックル","n":10},{"y":2026,"m":2,"c":"編集企画","i":"大海物語","n":10},{"y":2026,"m":2,"c":"編集企画","i":"海へ","n":9},{"y":2026,"m":2,"c":"編集企画","i":"だし劇場","n":7},{"y":2026,"m":2,"c":"編集企画","i":"ぽんぽこ亭","n":7},{"y":2026,"m":2,"c":"編集企画","i":"ひとりでこれるもん","n":6},{"y":2026,"m":2,"c":"目次","i":"ストロベリージャム","n":6},{"y":2026,"m":2,"c":"編集企画","i":"いろりあん","n":5},{"y":2026,"m":2,"c":"ビフォアフ","i":"星路","n":5},{"y":2026,"m":2,"c":"ビフォアフ","i":"JOJO","n":3},{"y":2026,"m":2,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":0},{"y":2026,"m":3,"c":"アンケート","i":"アンケートページ＿20260220","n":57},{"y":2026,"m":3,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":50},{"y":2026,"m":3,"c":"営業企画","i":"0220＿ジャパロカ","n":13},{"y":2026,"m":3,"c":"営業企画","i":"0220＿egg","n":9},{"y":2026,"m":3,"c":"編集企画","i":"0220＿すすきのジンギスカン","n":8},{"y":2026,"m":3,"c":"編集企画","i":"0220＿羊師","n":8},{"y":2026,"m":3,"c":"目次","i":"0220＿Noel","n":7},{"y":2026,"m":3,"c":"営業企画","i":"0220＿JOY-D","n":6},{"y":2026,"m":3,"c":"営業企画","i":"0220＿ストロベリージャム","n":6},{"y":2026,"m":3,"c":"営業企画","i":"0220＿俺スタジオ","n":6},{"y":2026,"m":3,"c":"編集企画","i":"0220＿ジンギスカン壱","n":5},{"y":2026,"m":3,"c":"編集企画","i":"0220＿大黒屋","n":5},{"y":2026,"m":3,"c":"営業企画","i":"0220＿Latir","n":5},{"y":2026,"m":3,"c":"営業企画","i":"0220＿バットルズ","n":4},{"y":2026,"m":3,"c":"営業企画","i":"0220＿は～もに～","n":4},{"y":2026,"m":3,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":4},{"y":2026,"m":3,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":4},{"y":2026,"m":3,"c":"編集企画","i":"0220＿ジンギスカンポッケ","n":3},{"y":2026,"m":3,"c":"編集企画","i":"0220＿紋別ジンギスカン","n":3},{"y":2026,"m":3,"c":"編集企画","i":"0220＿ジンギスカン羊庭","n":3},{"y":2026,"m":3,"c":"ビフォアフ","i":"0220＿アルカディア","n":3},{"y":2026,"m":3,"c":"ビフォアフ","i":"0220＿JOJO","n":3},{"y":2026,"m":3,"c":"編集企画","i":"0220＿平塚ジンギスカン","n":2},{"y":2026,"m":3,"c":"営業企画","i":"0220＿フェスリアン札幌","n":2},{"y":2026,"m":3,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2026,"m":4,"c":"アンケート","i":"アンケートページ＿20260320","n":86},{"y":2026,"m":4,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":25},{"y":2026,"m":4,"c":"編集企画","i":"0320＿カシンフウ","n":13},{"y":2026,"m":4,"c":"編集企画","i":"0320＿牡蠣と肉天国","n":13},{"y":2026,"m":4,"c":"編集企画","i":"0320＿FreeCインスタ","n":13},{"y":2026,"m":4,"c":"編集企画","i":"0320＿ドワ","n":11},{"y":2026,"m":4,"c":"編集企画","i":"0320_カシンフウ動画","n":10},{"y":2026,"m":4,"c":"編集企画","i":"0320＿ドワ動画","n":8},{"y":2026,"m":4,"c":"編集企画","i":"0320＿札幌天国","n":8},{"y":2026,"m":4,"c":"編集企画","i":"0320＿すすきのデパート","n":7},{"y":2026,"m":4,"c":"編集企画","i":"0320＿はち揚げ物店","n":6},{"y":2026,"m":4,"c":"編集企画","i":"0320＿はち揚げ物店動画","n":6},{"y":2026,"m":4,"c":"編集企画","i":"0320＿すすでぱ動画","n":5},{"y":2026,"m":4,"c":"目次","i":"0320＿はなはな","n":5},{"y":2026,"m":4,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":0},{"y":2026,"m":4,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":0},{"y":2026,"m":4,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":0},{"y":2026,"m":5,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":48},{"y":2026,"m":5,"c":"アンケート","i":"アンケートページ＿20260420","n":32},{"y":2026,"m":5,"c":"編集企画","i":"0420＿おばんざいふくろう","n":18},{"y":2026,"m":5,"c":"編集企画","i":"0420＿裏庭","n":10},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ダウンタウンガーデン","n":8},{"y":2026,"m":5,"c":"編集企画","i":"0420＿BarTio","n":8},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ふれんちのあ","n":6},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ふあーる","n":6},{"y":2026,"m":5,"c":"編集企画","i":"0420＿LAMP","n":5},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ニューさかばにどね","n":5},{"y":2026,"m":5,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":4},{"y":2026,"m":5,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":2},{"y":2026,"m":5,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":2},{"y":2026,"m":5,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":0},{"y":2026,"m":6,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":16},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ひとりでこれるもん","n":12},{"y":2026,"m":6,"c":"アンケート","i":"アンケートページ＿20260520","n":11},{"y":2026,"m":6,"c":"編集企画","i":"0520＿chiko","n":11},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ニクイボウズ","n":10},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ばっち","n":6},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ブラッスリーセルクル","n":4},{"y":2026,"m":6,"c":"編集企画","i":"0520＿5坪本店","n":4},{"y":2026,"m":6,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":4},{"y":2026,"m":6,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":3},{"y":2026,"m":6,"c":"編集企画","i":"0520＿餃子の松","n":2},{"y":2026,"m":6,"c":"目次","i":"0520＿UTAGE","n":1},{"y":2026,"m":6,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2026,"m":7,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":43},{"y":2026,"m":7,"c":"アンケート","i":"アンケートページ＿20260620","n":19},{"y":2026,"m":7,"c":"編集企画","i":"0620＿十方夷第","n":8},{"y":2026,"m":7,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":8},{"y":2026,"m":7,"c":"編集企画","i":"0620＿ルンゴカーニバル","n":7},{"y":2026,"m":7,"c":"編集企画","i":"0620＿焼肉れもん","n":5},{"y":2026,"m":7,"c":"編集企画","i":"0620＿ウエスタンキッチン","n":5},{"y":2026,"m":7,"c":"編集企画","i":"0620＿アフロプレイ","n":3},{"y":2026,"m":7,"c":"編集企画","i":"0620＿ベアガーデン","n":3},{"y":2026,"m":7,"c":"編集企画","i":"VOLTA","n":2},{"y":2026,"m":7,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":2},{"y":2026,"m":7,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2026,"m":8,"c":"アンケート","i":"アンケートページ＿20260720","n":51},{"y":2026,"m":8,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":50},{"y":2026,"m":8,"c":"編集企画","i":"0720_CLUB100","n":21},{"y":2026,"m":8,"c":"編集企画","i":"0720_幸せのレシピ","n":12},{"y":2026,"m":8,"c":"編集企画","i":"0720_COLIN","n":11},{"y":2026,"m":8,"c":"編集企画","i":"0720_デンキ茶房","n":11},{"y":2026,"m":8,"c":"編集企画","i":"0720_VIGO","n":11},{"y":2026,"m":8,"c":"純広告","i":"SSMAP＿クーポン面","n":11},{"y":2026,"m":8,"c":"純広告","i":"SSMAP＿南向きMAP面","n":11},{"y":2026,"m":8,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":7},{"y":2026,"m":8,"c":"目次","i":"0720＿東湖","n":6},{"y":2026,"m":8,"c":"編集企画","i":"0720_LUCY","n":5},{"y":2026,"m":8,"c":"編集企画","i":"0720_nuit.","n":4},{"y":2026,"m":8,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":4},{"y":2026,"m":8,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":3},{"y":2026,"m":9,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":69},{"y":2026,"m":9,"c":"アンケート","i":"アンケートページ＿20260820","n":48},{"y":2026,"m":9,"c":"編集企画","i":"0820_沖縄フェス","n":12},{"y":2026,"m":9,"c":"目次","i":"0820＿Raspy（目次）","n":12},{"y":2026,"m":9,"c":"純広告","i":"SSMAP＿クーポン面","n":11},{"y":2026,"m":9,"c":"編集企画","i":"0820_ニュー桂和ビル すすきのビアガーデン","n":8},{"y":2026,"m":9,"c":"編集企画","i":"0820_札幌エクセルホテル東急","n":8},{"y":2026,"m":9,"c":"純広告","i":"SSMAP＿南向きMAP面","n":8},{"y":2026,"m":9,"c":"編集企画","i":"0820_ラムグチカズヤ","n":7},{"y":2026,"m":9,"c":"編集企画","i":"0820_MEAT FES29","n":7},{"y":2026,"m":9,"c":"編集企画","i":"0820_BEAR GARDENすすきの店","n":5},{"y":2026,"m":9,"c":"編集企画","i":"0820_ROOFTOP GREEN GARDEN","n":5},{"y":2026,"m":9,"c":"編集企画","i":"0820_THE CAMP","n":4},{"y":2026,"m":9,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":2},{"y":2026,"m":9,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":0}]}</script>
+<script id="seed-data" type="application/json">{"version":1,"updatedAt":"2026-10-26T11:10:00+09:00","rows":[{"y":2025,"m":7,"c":"ビフォアフ","i":"7月号ビフォーアフター＿ELIZABETH","n":10},{"y":2025,"m":7,"c":"目次","i":"snack K＿目次","n":8},{"y":2025,"m":7,"c":"ビフォアフ","i":"7月号ビフォーアフター＿Girls Bar Mint","n":6},{"y":2025,"m":7,"c":"ビフォアフ","i":"7月号ビフォーアフター＿Strawberry Jam","n":5},{"y":2025,"m":8,"c":"目次","i":"スナック欒＿目次","n":10},{"y":2025,"m":8,"c":"ビフォアフ","i":"8月号ビフォーアフター＿はなはな","n":6},{"y":2025,"m":8,"c":"ビフォアフ","i":"8月号ビフォーアフター＿トー横","n":4},{"y":2025,"m":8,"c":"ビフォアフ","i":"8月号ビフォーアフター＿Attesa","n":3},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画ぴよるんぱ（深夜営業店）","n":30},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画天竺（深夜営業店）","n":15},{"y":2025,"m":9,"c":"目次","i":"アリストパレス目次","n":14},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画flatto（深夜営業店）","n":13},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画蜂屋（深夜営業店）","n":8},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画めるてぃ（深夜営業店）","n":8},{"y":2025,"m":9,"c":"ビフォアフ","i":"9月号ビフォーアフター＿ラルカジエデン","n":7},{"y":2025,"m":9,"c":"編集企画","i":"9月号企画しゃらら（深夜営業店）","n":7},{"y":2025,"m":9,"c":"ビフォアフ","i":"9月号ビフォーアフター＿NINE","n":3},{"y":2025,"m":9,"c":"ビフォアフ","i":"9月号ビフォーアフター＿DANDELION","n":3},{"y":2025,"m":10,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":29},{"y":2025,"m":10,"c":"編集企画","i":"0920企画焙煎舎","n":13},{"y":2025,"m":10,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":11},{"y":2025,"m":10,"c":"編集企画","i":"0920企画緋AKA","n":10},{"y":2025,"m":10,"c":"編集企画","i":"0920企画明かり家","n":10},{"y":2025,"m":10,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":9},{"y":2025,"m":10,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":8},{"y":2025,"m":10,"c":"編集企画","i":"0920企画一馬","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画嶋や","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画桜井製麵所","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画soba青","n":7},{"y":2025,"m":10,"c":"目次","i":"JOJO目次","n":7},{"y":2025,"m":10,"c":"編集企画","i":"0920企画すすきの軒","n":6},{"y":2025,"m":10,"c":"編集企画","i":"0920企画辛いち","n":6},{"y":2025,"m":10,"c":"編集企画","i":"0920企画すずらん","n":5},{"y":2025,"m":10,"c":"ビフォアフ","i":"10月号ビフォーアフター＿Attesa","n":2},{"y":2025,"m":10,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":2},{"y":2025,"m":10,"c":"ビフォアフ","i":"10月号ビフォーアフター＿CLUBLILY","n":1},{"y":2025,"m":10,"c":"ビフォアフ","i":"10月号ビフォーアフター＿PLEDGE","n":1},{"y":2025,"m":10,"c":"純広告","i":"アソビアン","n":0},{"y":2025,"m":11,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":24},{"y":2025,"m":11,"c":"編集企画","i":"1020企画しょんぴいケーキ","n":13},{"y":2025,"m":11,"c":"編集企画","i":"1020企画茶寮","n":6},{"y":2025,"m":11,"c":"編集企画","i":"1020企画いっぺこっぺ","n":6},{"y":2025,"m":11,"c":"編集企画","i":"1020企画クリム","n":5},{"y":2025,"m":11,"c":"編集企画","i":"1020企画サンタクリーム","n":5},{"y":2025,"m":11,"c":"編集企画","i":"ちょこっと寿司別邸","n":5},{"y":2025,"m":11,"c":"編集企画","i":"1020企画たこキング","n":5},{"y":2025,"m":11,"c":"編集企画","i":"1020企画しげぱん","n":4},{"y":2025,"m":11,"c":"ビフォアフ","i":"11月号ビフォーアフター＿めるれっと","n":4},{"y":2025,"m":11,"c":"目次","i":"attesa目次","n":4},{"y":2025,"m":11,"c":"ビフォアフ","i":"11月号ビフォーアフター＿CATCH","n":3},{"y":2025,"m":11,"c":"ビフォアフ","i":"11月号ビフォーアフター＿サザンクロス","n":2},{"y":2025,"m":11,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":2},{"y":2025,"m":11,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":1},{"y":2025,"m":11,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2025,"m":11,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":0},{"y":2025,"m":11,"c":"純広告","i":"アソビアン","n":0},{"y":2025,"m":12,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":36},{"y":2025,"m":12,"c":"編集企画","i":"彩ノ匠","n":13},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店囲","n":10},{"y":2025,"m":12,"c":"編集企画","i":"nendo","n":8},{"y":2025,"m":12,"c":"編集企画","i":"かわ屋","n":8},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店3号店","n":7},{"y":2025,"m":12,"c":"営業企画","i":"大黒屋1号店","n":7},{"y":2025,"m":12,"c":"編集企画","i":"五坪忍亭","n":7},{"y":2025,"m":12,"c":"編集企画","i":"唐韻","n":7},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店2号店","n":6},{"y":2025,"m":12,"c":"営業企画","i":"焼鳥と海鮮しん","n":6},{"y":2025,"m":12,"c":"編集企画","i":"俺流","n":6},{"y":2025,"m":12,"c":"営業企画","i":"平塚ジンギスカン","n":5},{"y":2025,"m":12,"c":"営業企画","i":"工藤羊肉店本店","n":5},{"y":2025,"m":12,"c":"編集企画","i":"ダパイダン","n":5},{"y":2025,"m":12,"c":"目次","i":"LECIA","n":5},{"y":2025,"m":12,"c":"営業企画","i":"すすきのジンギスカン","n":4},{"y":2025,"m":12,"c":"営業企画","i":"ジンギスカン羊師","n":3},{"y":2025,"m":12,"c":"営業企画","i":"北海しゃぶしゃぶ","n":3},{"y":2025,"m":12,"c":"営業企画","i":"しゃぶ平","n":3},{"y":2025,"m":12,"c":"営業企画","i":"大黒屋2号店","n":3},{"y":2025,"m":12,"c":"営業企画","i":"大黒屋3号店","n":3},{"y":2025,"m":12,"c":"営業企画","i":"いさざ和","n":2},{"y":2025,"m":12,"c":"ビフォアフ","i":"にゅ～かまっく","n":2},{"y":2025,"m":12,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":2},{"y":2025,"m":12,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":1},{"y":2025,"m":12,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2025,"m":12,"c":"ビフォアフ","i":"グランシャリオ","n":0},{"y":2025,"m":12,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":0},{"y":2025,"m":12,"c":"純広告","i":"アソビアン","n":0},{"y":2026,"m":1,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":55},{"y":2026,"m":1,"c":"編集企画","i":"パープルダリア","n":21},{"y":2026,"m":1,"c":"編集企画","i":"ロジウラカフェ","n":16},{"y":2026,"m":1,"c":"編集企画","i":"BerryGarden","n":15},{"y":2026,"m":1,"c":"編集企画","i":"パフェ佐藤","n":14},{"y":2026,"m":1,"c":"編集企画","i":"SABO","n":13},{"y":2026,"m":1,"c":"目次","i":"CLUBLILY","n":13},{"y":2026,"m":1,"c":"編集企画","i":"たぬきクレープ","n":12},{"y":2026,"m":1,"c":"編集企画","i":"ネモちゃんランド3","n":10},{"y":2026,"m":1,"c":"編集企画","i":"ミルク村","n":9},{"y":2026,"m":1,"c":"編集企画","i":"MUA","n":8},{"y":2026,"m":1,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":7},{"y":2026,"m":1,"c":"編集企画","i":"RiQ","n":6},{"y":2026,"m":1,"c":"編集企画","i":"市川茶屋","n":6},{"y":2026,"m":1,"c":"ビフォアフ","i":"JOJO","n":6},{"y":2026,"m":1,"c":"ビフォアフ","i":"サザンクロス","n":6},{"y":2026,"m":1,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":5},{"y":2026,"m":2,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":108},{"y":2026,"m":2,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":17},{"y":2026,"m":2,"c":"編集企画","i":"コロポックル","n":10},{"y":2026,"m":2,"c":"編集企画","i":"大海物語","n":10},{"y":2026,"m":2,"c":"編集企画","i":"海へ","n":9},{"y":2026,"m":2,"c":"編集企画","i":"だし劇場","n":7},{"y":2026,"m":2,"c":"編集企画","i":"ぽんぽこ亭","n":7},{"y":2026,"m":2,"c":"編集企画","i":"ひとりでこれるもん","n":6},{"y":2026,"m":2,"c":"目次","i":"ストロベリージャム","n":6},{"y":2026,"m":2,"c":"編集企画","i":"いろりあん","n":5},{"y":2026,"m":2,"c":"ビフォアフ","i":"星路","n":5},{"y":2026,"m":2,"c":"ビフォアフ","i":"JOJO","n":3},{"y":2026,"m":2,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":0},{"y":2026,"m":3,"c":"アンケート","i":"アンケートページ＿20260220","n":57},{"y":2026,"m":3,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":50},{"y":2026,"m":3,"c":"営業企画","i":"0220＿ジャパロカ","n":13},{"y":2026,"m":3,"c":"営業企画","i":"0220＿egg","n":9},{"y":2026,"m":3,"c":"編集企画","i":"0220＿すすきのジンギスカン","n":8},{"y":2026,"m":3,"c":"編集企画","i":"0220＿羊師","n":8},{"y":2026,"m":3,"c":"目次","i":"0220＿Noel","n":7},{"y":2026,"m":3,"c":"営業企画","i":"0220＿JOY-D","n":6},{"y":2026,"m":3,"c":"営業企画","i":"0220＿ストロベリージャム","n":6},{"y":2026,"m":3,"c":"営業企画","i":"0220＿俺スタジオ","n":6},{"y":2026,"m":3,"c":"編集企画","i":"0220＿ジンギスカン壱","n":5},{"y":2026,"m":3,"c":"編集企画","i":"0220＿大黒屋","n":5},{"y":2026,"m":3,"c":"営業企画","i":"0220＿Latir","n":5},{"y":2026,"m":3,"c":"営業企画","i":"0220＿バットルズ","n":4},{"y":2026,"m":3,"c":"営業企画","i":"0220＿は～もに～","n":4},{"y":2026,"m":3,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":4},{"y":2026,"m":3,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":4},{"y":2026,"m":3,"c":"編集企画","i":"0220＿ジンギスカンポッケ","n":3},{"y":2026,"m":3,"c":"編集企画","i":"0220＿紋別ジンギスカン","n":3},{"y":2026,"m":3,"c":"編集企画","i":"0220＿ジンギスカン羊庭","n":3},{"y":2026,"m":3,"c":"ビフォアフ","i":"0220＿アルカディア","n":3},{"y":2026,"m":3,"c":"ビフォアフ","i":"0220＿JOJO","n":3},{"y":2026,"m":3,"c":"編集企画","i":"0220＿平塚ジンギスカン","n":2},{"y":2026,"m":3,"c":"営業企画","i":"0220＿フェスリアン札幌","n":2},{"y":2026,"m":3,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2026,"m":4,"c":"アンケート","i":"アンケートページ＿20260320","n":86},{"y":2026,"m":4,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":25},{"y":2026,"m":4,"c":"編集企画","i":"0320＿カシンフウ","n":13},{"y":2026,"m":4,"c":"編集企画","i":"0320＿牡蠣と肉天国","n":13},{"y":2026,"m":4,"c":"編集企画","i":"0320＿FreeCインスタ","n":13},{"y":2026,"m":4,"c":"編集企画","i":"0320＿ドワ","n":11},{"y":2026,"m":4,"c":"編集企画","i":"0320_カシンフウ動画","n":10},{"y":2026,"m":4,"c":"編集企画","i":"0320＿ドワ動画","n":8},{"y":2026,"m":4,"c":"編集企画","i":"0320＿札幌天国","n":8},{"y":2026,"m":4,"c":"編集企画","i":"0320＿すすきのデパート","n":7},{"y":2026,"m":4,"c":"編集企画","i":"0320＿はち揚げ物店","n":6},{"y":2026,"m":4,"c":"編集企画","i":"0320＿はち揚げ物店動画","n":6},{"y":2026,"m":4,"c":"編集企画","i":"0320＿すすでぱ動画","n":5},{"y":2026,"m":4,"c":"目次","i":"0320＿はなはな","n":5},{"y":2026,"m":4,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":0},{"y":2026,"m":4,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":0},{"y":2026,"m":4,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":0},{"y":2026,"m":5,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":48},{"y":2026,"m":5,"c":"アンケート","i":"アンケートページ＿20260420","n":32},{"y":2026,"m":5,"c":"編集企画","i":"0420＿おばんざいふくろう","n":18},{"y":2026,"m":5,"c":"編集企画","i":"0420＿裏庭","n":10},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ダウンタウンガーデン","n":8},{"y":2026,"m":5,"c":"編集企画","i":"0420＿BarTio","n":8},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ふれんちのあ","n":6},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ふあーる","n":6},{"y":2026,"m":5,"c":"編集企画","i":"0420＿LAMP","n":5},{"y":2026,"m":5,"c":"編集企画","i":"0420＿ニューさかばにどね","n":5},{"y":2026,"m":5,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":4},{"y":2026,"m":5,"c":"純広告","i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":2},{"y":2026,"m":5,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":2},{"y":2026,"m":5,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":0},{"y":2026,"m":6,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":16},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ひとりでこれるもん","n":12},{"y":2026,"m":6,"c":"アンケート","i":"アンケートページ＿20260520","n":11},{"y":2026,"m":6,"c":"編集企画","i":"0520＿chiko","n":11},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ニクイボウズ","n":10},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ばっち","n":6},{"y":2026,"m":6,"c":"編集企画","i":"0520＿ブラッスリーセルクル","n":4},{"y":2026,"m":6,"c":"編集企画","i":"0520＿5坪本店","n":4},{"y":2026,"m":6,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":4},{"y":2026,"m":6,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":3},{"y":2026,"m":6,"c":"編集企画","i":"0520＿餃子の松","n":2},{"y":2026,"m":6,"c":"目次","i":"0520＿UTAGE","n":1},{"y":2026,"m":6,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2026,"m":7,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":43},{"y":2026,"m":7,"c":"アンケート","i":"アンケートページ＿20260620","n":19},{"y":2026,"m":7,"c":"編集企画","i":"0620＿十方夷第","n":8},{"y":2026,"m":7,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":8},{"y":2026,"m":7,"c":"編集企画","i":"0620＿ルンゴカーニバル","n":7},{"y":2026,"m":7,"c":"編集企画","i":"0620＿焼肉れもん","n":5},{"y":2026,"m":7,"c":"編集企画","i":"0620＿ウエスタンキッチン","n":5},{"y":2026,"m":7,"c":"編集企画","i":"0620＿アフロプレイ","n":3},{"y":2026,"m":7,"c":"編集企画","i":"0620＿ベアガーデン","n":3},{"y":2026,"m":7,"c":"編集企画","i":"VOLTA","n":2},{"y":2026,"m":7,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":2},{"y":2026,"m":7,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":1},{"y":2026,"m":8,"c":"アンケート","i":"アンケートページ＿20260720","n":51},{"y":2026,"m":8,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":50},{"y":2026,"m":8,"c":"編集企画","i":"0720_CLUB100","n":21},{"y":2026,"m":8,"c":"編集企画","i":"0720_幸せのレシピ","n":12},{"y":2026,"m":8,"c":"編集企画","i":"0720_COLIN","n":11},{"y":2026,"m":8,"c":"編集企画","i":"0720_デンキ茶房","n":11},{"y":2026,"m":8,"c":"編集企画","i":"0720_VIGO","n":11},{"y":2026,"m":8,"c":"純広告","i":"SSMAP＿クーポン面","n":11},{"y":2026,"m":8,"c":"純広告","i":"SSMAP＿南向きMAP面","n":11},{"y":2026,"m":8,"c":"純広告","i":"すすきのフリーク【公式】Instagram","n":7},{"y":2026,"m":8,"c":"目次","i":"0720＿東湖","n":6},{"y":2026,"m":8,"c":"編集企画","i":"0720_LUCY","n":5},{"y":2026,"m":8,"c":"編集企画","i":"0720_nuit.","n":4},{"y":2026,"m":8,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":4},{"y":2026,"m":8,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":3},{"y":2026,"m":9,"c":"表紙","i":"すすきのFreeC　表紙QRコード【固定】","n":69},{"y":2026,"m":9,"c":"アンケート","i":"アンケートページ＿20260820","n":48},{"y":2026,"m":9,"c":"編集企画","i":"0820_沖縄フェス","n":12},{"y":2026,"m":9,"c":"目次","i":"0820＿Raspy（目次）","n":12},{"y":2026,"m":9,"c":"純広告","i":"SSMAP＿クーポン面","n":11},{"y":2026,"m":9,"c":"編集企画","i":"0820_ニュー桂和ビル すすきのビアガーデン","n":8},{"y":2026,"m":9,"c":"編集企画","i":"0820_札幌エクセルホテル東急","n":8},{"y":2026,"m":9,"c":"純広告","i":"SSMAP＿南向きMAP面","n":8},{"y":2026,"m":9,"c":"編集企画","i":"0820_ラムグチカズヤ","n":7},{"y":2026,"m":9,"c":"編集企画","i":"0820_MEAT FES29","n":7},{"y":2026,"m":9,"c":"編集企画","i":"0820_BEAR GARDENすすきの店","n":5},{"y":2026,"m":9,"c":"編集企画","i":"0820_ROOFTOP GREEN GARDEN","n":5},{"y":2026,"m":9,"c":"編集企画","i":"0820_THE CAMP","n":4},{"y":2026,"m":9,"c":"純広告","i":"すすきのFreeC　純広(目次)QRコード【固定】","n":2},{"y":2026,"m":9,"c":"純広告","i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":0}],"carry":{"label":"8/24","items":[{"i":"アソビアン","n":5},{"i":"すすきのフリーク【公式】Instagram","n":40},{"i":"すすきのFreeC　純広(すF横型1/2)QRコード【固定】","n":37},{"i":"すすきのFreeC　純広(すF縦型1/2)QRコード【固定】","n":52},{"i":"すすきのFreeC　純広(目次)QRコード【固定】","n":38},{"i":"すすきのFreeC　表紙QRコード【固定】","n":634}]}}</script>
 <script>
 (function(){
 'use strict';
@@ -614,6 +651,18 @@ function loadDraft(){
 const draftStored = loadDraft();
 let draftActive = !!draftStored;
 let draftMeta = { base: draftStored ? draftStored.baseUpdatedAt : null, exportedAt: draftStored ? (draftStored.exportedAt || null) : null };
+function normCarry(c){
+  const out = { label:'', items:[] };
+  if(c && typeof c === 'object'){
+    out.label = String(c.label == null ? '' : c.label).trim().slice(0,20);
+    (Array.isArray(c.items) ? c.items : []).forEach(x => {
+      const i = String(x && x.i != null ? x.i : '').trim(), n = Math.round(Number(x && x.n));
+      if(i && isFinite(n) && n >= 0) out.items.push({ i, n });
+    });
+  }
+  return out;
+}
+let carry = normCarry(draftStored && draftStored.carry ? draftStored.carry : seed.carry);
 let rows = toRuntime(draftStored ? draftStored.rows : seed.rows);
 let DATA = null;
 let years = [], monthsByYear = {};
@@ -625,7 +674,7 @@ let monthlyChart, adChart, catDonutChart;
 
 function persistDraft(){
   try{
-    localStorage.setItem(LS_KEY, JSON.stringify({ baseUpdatedAt: draftMeta.base, exportedAt: draftMeta.exportedAt, savedAt: new Date().toISOString(), rows: plain(rows) }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ baseUpdatedAt: draftMeta.base, exportedAt: draftMeta.exportedAt, savedAt: new Date().toISOString(), rows: plain(rows), carry }));
     return true;
   }catch(e){ return false; }
 }
@@ -643,7 +692,15 @@ function markDirty(){
 /* ================= 描画（ダッシュボード本体） ================= */
 function catColor(c){ const i = DATA.categories.indexOf(c); return PALETTE[(i>=0?i:0) % PALETTE.length]; }
 
+function renderCarry(){
+  const card = $('carryCard'); if(!card) return;
+  card.hidden = !carry.items.length;
+  if(!carry.items.length) return;
+  $('carryTitle').textContent = '前月までの累計' + (carry.label ? '（' + carry.label + '時点）' : '');
+  $('carryList').innerHTML = carry.items.map(x => `<div class="carry-row"><span class="nm">${esc(x.i)}</span><span class="v">${fmt(x.n)}回</span></div>`).join('');
+}
 function boot(){
+  renderCarry();
   const has = rows.length > 0;
   $('mainContent').hidden = !has;
   $('emptyState').hidden = has;
@@ -658,7 +715,8 @@ function boot(){
   });
   years = Object.keys(monthsByYear).sort();
 
-  if(!sel.year || !monthsByYear[sel.year]){ sel = { year: DATA.latest_month_label.match(/(\d+)年/)[1], value: DATA.latest_month_label }; }
+  if(sel.year === 'ALLY'){ sel.value = 'ALL'; }
+  else if(!sel.year || !monthsByYear[sel.year]){ sel = { year: DATA.latest_month_label.match(/(\d+)年/)[1], value: DATA.latest_month_label }; }
   else if(sel.value !== 'ALL' && !monthsByYear[sel.year].some(m=>m.label===sel.value)){ sel.value = monthsByYear[sel.year][monthsByYear[sel.year].length-1].label; }
 
   $('periodText').textContent = DATA.months_full[0] + ' 〜 ' + DATA.latest_month_label;
@@ -703,6 +761,7 @@ function boot(){
 
   // 年・月セレクト
   const ys = $('yearSelect'); ys.innerHTML = '';
+  { const o = document.createElement('option'); o.value = 'ALLY'; o.textContent = '全期間'; ys.appendChild(o); }
   years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y + '年'; ys.appendChild(o); });
   ys.value = sel.year;
   populateMonthOptions(sel.year, sel.value);
@@ -865,6 +924,11 @@ function renderCategoryShare(titleText, catCountObj){
 
 function populateMonthOptions(year, preselectValue){
   const el = $('monthOnlySelect'); el.innerHTML = '';
+  if(year === 'ALLY'){
+    const o = document.createElement('option'); o.value = 'ALL'; o.textContent = '全期間合計'; el.appendChild(o);
+    el.value = 'ALL'; el.disabled = true; return;
+  }
+  el.disabled = false;
   const allOpt = document.createElement('option'); allOpt.value = 'ALL'; allOpt.textContent = '年間合計'; el.appendChild(allOpt);
   monthsByYear[year].forEach(m=>{ const o = document.createElement('option'); o.value = m.label; o.textContent = m.month + '月'; el.appendChild(o); });
   el.value = preselectValue;
@@ -955,8 +1019,47 @@ function renderRankTable(titleText, totalBadge, items){
   </tbody></table>`;
 }
 
+function allTimeItems(){
+  const m = new Map();
+  rows.forEach(r => { const k = r.c + '\u0000' + r.i; const g = m.get(k) || { category:r.c, item:r.i, count:0 }; g.count += r.n; m.set(k,g); });
+  return Array.from(m.values()).sort((a,b)=>b.count-a.count);
+}
+function applyAllTime(){
+  const deltaEl = $('kpiDelta');
+  const total = DATA.monthly_total.reduce((s,v)=>s+v,0);
+  const items = allTimeItems();
+  $('kpiTotalLabel').textContent = '全期間 合計読み込み数';
+  $('kpiTotal').innerHTML = fmt(total) + '<small>回</small>';
+  const nm = DATA.months_full.length, avg = nm ? Math.round(total/nm) : 0;
+  $('kpiLatestLabel').textContent = '月平均';
+  $('kpiLatest').innerHTML = fmt(avg) + '<small>回</small>';
+  deltaEl.textContent = DATA.months_full[0] + ' 〜 ' + DATA.latest_month_label + '（' + nm + 'か月）'; deltaEl.className = 'delta';
+  renderRankTable('全期間 読み込みランキング（累計）', total, items);
+  $('kpiTopItemLabel').textContent = '全期間 最多QR枠';
+  $('kpiTopItem').textContent = items[0].item;
+  $('kpiTopItemCat').textContent = items[0].category + ' ・ ' + fmt(items[0].count) + '回';
+  $('kpiCoverLabel').textContent = '全期間 表紙QRコード集計数';
+  $('kpiCover').innerHTML = fmt(Object.values(DATA.cover_by_year).reduce((s,v)=>s+v,0)) + '<small>回</small>';
+  renderCategoryShare('全期間のカテゴリ別シェア', DATA.cat_total);
+  // 分析文
+  const out = [];
+  $('analysisTitle').textContent = '全期間のポイント';
+  out.push(row(INK.cyan,'Σ', `${DATA.months_full[0]}〜${DATA.latest_month_label}（${nm}か月）の合計読み込み数は <b>${fmt(total)}回</b>、月平均は <b>${fmt(avg)}回</b>です。`));
+  const top = DATA.categories.map(c=>({name:c, count:DATA.cat_total[c]||0})).sort((a,b)=>b.count-a.count)[0];
+  out.push(row(INK.amber,'◆', `カテゴリ別では <b>「${esc(top.name)}」</b> が ${fmt(top.count)}回で最多、全体の <b>${pctOf(top.count, total)}%</b> を占めています。`));
+  out.push(row(INK.pink,'★', `個別のQR枠では <b>「${esc(items[0].item)}」</b>（${esc(items[0].category)}）が累計 ${fmt(items[0].count)}回でトップです。`));
+  if(nm > 1){
+    const best = DATA.months_full.reduce((a,b,i)=> DATA.monthly_total[i] > DATA.monthly_total[DATA.months_full.indexOf(a)] ? b : a);
+    const worst = DATA.months_full.reduce((a,b,i)=> DATA.monthly_total[i] < DATA.monthly_total[DATA.months_full.indexOf(a)] ? b : a);
+    out.push(row(INK.green,'◎', `月別では <b>${best}</b> が ${fmt(DATA.monthly_total[DATA.months_full.indexOf(best)])}回で最多、<b>${worst}</b> が ${fmt(DATA.monthly_total[DATA.months_full.indexOf(worst)])}回で最少でした。`));
+  }
+  out.push(row(INK.purple,'#', `これまでに登録されたQR枠は全 <b>${fmt(rows.length)}件</b>（${new Set(rows.map(r=>r.i)).size}種類の名前）です。`));
+  $('analysisList').innerHTML = out.join('');
+}
+
 function applySelection(year, value){
   sel = { year, value };
+  if(year === 'ALLY'){ applyAllTime(); return; }
   renderAnalysis(year, value);
   const deltaEl = $('kpiDelta');
 
@@ -1060,11 +1163,14 @@ function fillMonthPicker(){
   const ys = rows.map(r=>r.y); const nowY = new Date().getFullYear();
   const minY = Math.min(nowY, ...(ys.length?ys:[nowY])), maxY = Math.max(nowY, ...(ys.length?ys:[nowY])) + 1;
   const yEl = $('edYear'), mEl = $('edMonth'); yEl.innerHTML = ''; mEl.innerHTML = '';
+  { const o = document.createElement('option'); o.value = 0; o.textContent = '全期間'; yEl.appendChild(o); }
   for(let y=minY; y<=maxY; y++){ const o = document.createElement('option'); o.value = y; o.textContent = y + '年'; yEl.appendChild(o); }
+  { const o = document.createElement('option'); o.value = 0; o.textContent = '全て'; mEl.appendChild(o); }
   for(let m=1; m<=12; m++){ const o = document.createElement('option'); o.value = m; o.textContent = m + '月'; mEl.appendChild(o); }
-  yEl.value = edMonth.y; mEl.value = edMonth.m;
+  if(edMonth.y===0) edMonth.m = 0;
+  yEl.value = edMonth.y; mEl.value = edMonth.m; mEl.disabled = edMonth.y===0;
   const exists = rows.some(r=>r.y===edMonth.y && r.m===edMonth.m);
-  $('edMonthHint').textContent = exists ? 'この月のデータは入力済みです（下で編集・追加できます）' : 'この月のデータはまだありません';
+  $('edMonthHint').textContent = isAgg() ? '「全て」表示中：同じ名前の枠を合算した累計です（追加・編集は月を選んで行います）' : exists ? 'この月のデータは入力済みです（下で編集・追加できます）' : 'この月のデータはまだありません';
   renderEdStats();
 }
 
@@ -1084,22 +1190,26 @@ function fillItemSuggestions(){
   Array.from(new Set(rows.filter(r=>r.c===cat).map(r=>r.i))).slice(-400).forEach(i => { const o = document.createElement('option'); o.value = i; dl.appendChild(o); });
 }
 
-function monthRows(){ return rows.filter(r=>r.y===edMonth.y && r.m===edMonth.m); }
+function isAgg(){ return edMonth.y===0 || edMonth.m===0; }
+function periodRows(){ return rows.filter(r=>(edMonth.y===0 || r.y===edMonth.y) && (edMonth.m===0 || r.m===edMonth.m)); }
+function periodLabel(){ return edMonth.y===0 ? '全期間' : edMonth.m===0 ? edMonth.y+'年（全て）' : edMonth.y+'年'+edMonth.m+'月'; }
+function monthRows(){ return isAgg() ? [] : rows.filter(r=>r.y===edMonth.y && r.m===edMonth.m); }
 
 function renderEdStats(){
   const el = $('edStats'); if(!el || !edMonth) return;
   const sum = list => list.reduce((s,r)=>s+r.n,0);
   const all = sum(rows);
-  const yearRows = rows.filter(r=>r.y===edMonth.y);
-  const monthTotal = sum(monthRows());
+  const yearRows = rows.filter(r=>edMonth.y===0 || r.y===edMonth.y);
+  const monthTotal = sum(periodRows());
+  const itemCount = new Set(periodRows().map(r=>r.i)).size;
   const cat = $('edCat') ? $('edCat').value : '';
   const hasCat = cat && cat !== '__new__';
   const catRows = hasCat ? rows.filter(r=>r.c===cat) : [];
   const monthsCount = new Set(rows.map(keyOf)).size;
   el.innerHTML = `
     <div class="mini-stat hl"><div class="k">全期間の累計読み込み数</div><div class="v">${fmt(all)}<small>回</small></div></div>
-    <div class="mini-stat"><div class="k">${edMonth.y}年の累計</div><div class="v">${fmt(sum(yearRows))}<small>回</small></div></div>
-    <div class="mini-stat"><div class="k">${edMonth.y}年${edMonth.m}月の合計</div><div class="v">${fmt(monthTotal)}<small>回</small></div></div>
+    <div class="mini-stat"><div class="k">${edMonth.y===0 ? '登録されている枠の数' : edMonth.y+'年の累計'}</div><div class="v">${edMonth.y===0 ? fmt(itemCount)+'<small>枠</small>' : fmt(sum(yearRows))+'<small>回</small>'}</div></div>
+    <div class="mini-stat"><div class="k">${periodLabel()}の合計</div><div class="v">${fmt(monthTotal)}<small>回</small></div></div>
     <div class="mini-stat"><div class="k">${hasCat ? '「'+esc(cat)+'」の累計' : 'カテゴリ別の累計'}</div><div class="v">${hasCat ? fmt(sum(catRows)) : '-'}<small>${hasCat ? '回' : ''}</small></div></div>`;
   updateItemHint();
 }
@@ -1114,7 +1224,26 @@ function updateItemHint(){
   const last = hit.slice().sort((a,b)=>keyOf(b)-keyOf(a))[0];
   hint.innerHTML = '「' + esc(name) + '」のこれまでの累計：<b>' + fmt(total) + '回</b>（' + hit.length + '回掲載・' + esc(cats) + '／直近 ' + labOf(keyOf(last)) + ' ' + fmt(last.n) + '回）';
 }
+function renderAggRows(){
+  const host = $('edRows'), f = $('edAggFilter'); f.hidden = false;
+  const map = new Map();
+  periodRows().forEach(r => {
+    let g = map.get(r.i); if(!g){ g = { name:r.i, total:0, cnt:0, cats:new Set() }; map.set(r.i,g); }
+    g.total += r.n; g.cnt++; g.cats.add(r.c);
+  });
+  let list = Array.from(map.values()).sort((a,b)=>b.total-a.total || a.name.localeCompare(b.name,'ja'));
+  const all = list.reduce((s,g)=>s+g.total,0);
+  $('edMonthTitle').textContent = periodLabel() + 'の枠別累計（同じ名前は合算）';
+  $('edMonthSummary').textContent = list.length ? `${list.length}枠 ／ 合計 ${fmt(all)}回` : '';
+  const q = f.value.trim().toLowerCase();
+  if(q) list = list.filter(g => g.name.toLowerCase().includes(q));
+  if(!list.length){ host.innerHTML = '<div class="empty-note">' + (q ? '該当する枠がありません。' : 'データがありません。') + '</div>'; return; }
+  host.innerHTML = '<div class="agg-row head"><span>QR枠名</span><span class="ct">カテゴリ</span><span class="num">掲載</span><span class="num">累計</span></div>' +
+    list.map(g => `<div class="agg-row"><span class="nm">${esc(g.name)}</span><span class="ct">${esc(Array.from(g.cats).join('・'))}</span><span class="num">${g.cnt}回</span><span class="num tot">${fmt(g.total)}回</span></div>`).join('');
+}
 function renderEntryRows(){
+  if(isAgg()){ renderAggRows(); return; }
+  $('edAggFilter').hidden = true;
   const list = monthRows();
   const total = list.reduce((s,r)=>s+r.n,0);
   $('edMonthTitle').textContent = edMonth.y + '年' + edMonth.m + '月の入力済みデータ';
@@ -1137,6 +1266,7 @@ function refreshEditor(){
 
 function addEntry(){
   const err = $('entryError'); err.textContent = '';
+  if(isAgg()){ err.textContent = '追加するには、集計月で年と月を選んでください（「全て」では追加できません）。'; return; }
   let cat = $('edCat').value;
   if(cat === '__new__'){ cat = $('edNewCat').value.trim(); if(!cat){ err.textContent = '新しいカテゴリ名を入力してください。'; $('edNewCat').focus(); return; } }
   const item = $('edItem').value.trim();
@@ -1189,6 +1319,7 @@ function renderPastePreview(){
   const host = $('pastePreview');
   const r = pasteParsed;
   if(!r){ host.innerHTML = ''; return; }
+  if(isAgg()){ host.innerHTML = '<div class="pv-summary"><span class="warn">⚠ 登録先の年と月を選んでください（「全て」「全期間」には登録できません）。</span></div>'; $('pasteApply').disabled = true; return; }
   const known = new Set(rows.map(x=>x.c));
   const newCats = Array.from(new Set(r.ok.map(x=>x.c).filter(c=>!known.has(c))));
   const existing = monthRows().length;
@@ -1213,7 +1344,7 @@ function renderPastePreview(){
   $('pasteApply').disabled = r.ok.length === 0;
 }
 function applyPaste(){
-  if(!pasteParsed || !pasteParsed.ok.length) return;
+  if(!pasteParsed || !pasteParsed.ok.length || isAgg()) return;
   if($('pasteReplace').checked){ rows = rows.filter(r=>!(r.y===edMonth.y && r.m===edMonth.m)); }
   pasteParsed.ok.forEach(x => rows.push({ id:++rid, y:edMonth.y, m:edMonth.m, c:x.c, i:x.i, n:x.n }));
   const cnt = pasteParsed.ok.length;
@@ -1238,7 +1369,7 @@ function renderPublishTab(){
 }
 function exportJSON(){
   const stamp = new Date().toISOString();
-  const payload = { version:1, updatedAt:stamp, rows: plain(rows).sort((a,b)=>keyOf(a)-keyOf(b)) };
+  const payload = { version:1, updatedAt:stamp, rows: plain(rows).sort((a,b)=>keyOf(a)-keyOf(b)), carry };
   const blob = new Blob([JSON.stringify(payload)], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'data.json';
@@ -1257,7 +1388,7 @@ function importJSON(file){
       if(!d || !Array.isArray(d.rows)) throw new Error('形式が違います');
       const list = toRuntime(d.rows);
       if(!list.length) throw new Error('読み込める行がありませんでした');
-      rows = list; markDirty(); refreshEditor(); renderPublishTab();
+      rows = list; if(d.carry) carry = normCarry(d.carry); markDirty(); refreshEditor(); renderPublishTab();
       toast(list.length + '件を読み込みました');
     }catch(e){ err.textContent = '読み込めませんでした：' + e.message; }
   };
@@ -1266,17 +1397,27 @@ function importJSON(file){
 }
 function discardDraft(){
   clearDraft(); draftActive = false; draftMeta = { base:null, exportedAt:null };
-  rows = toRuntime(published.rows); edMonth = null;
+  rows = toRuntime(published.rows); carry = normCarry(published.carry || seed.carry); edMonth = null;
   boot(); updateBanner(); refreshEditor(); renderPublishTab();
   toast('公開中のデータに戻しました');
 }
 
 /* ---- パネルの開閉・タブ ---- */
+function renderCarryEditor(){
+  $('carryLabel').value = carry.label;
+  const dl = $('carryItemList'); dl.innerHTML = '';
+  Array.from(new Set(rows.map(r=>r.i))).slice(-400).forEach(i => { const o = document.createElement('option'); o.value = i; dl.appendChild(o); });
+  const host = $('carryRows');
+  if(!carry.items.length){ host.innerHTML = '<div class="empty-note">まだ項目がありません。下のフォームから追加してください。</div>'; return; }
+  host.innerHTML = carry.items.map((x,k) => `<div class="carry-edit" data-k="${k}"><input class="input c-item" value="${esc(x.i)}" maxlength="120" aria-label="項目名"><input class="input c-n" type="number" inputmode="numeric" min="0" step="1" value="${x.n}" aria-label="累計"><button class="del" type="button" title="この行を削除" aria-label="この行を削除">🗑</button></div>`).join('');
+}
+function carryChanged(){ markDirty(); }
 function showTab(name){
   document.querySelectorAll('#editorTabs .tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
-  ['entry','paste','publish'].forEach(t => { $('tab-'+t).hidden = (t !== name); });
-  $('monthPickerBar').hidden = (name === 'publish');
-  $('edStats').hidden = (name === 'publish');
+  ['entry','paste','carry','publish'].forEach(t => { $('tab-'+t).hidden = (t !== name); });
+  $('monthPickerBar').hidden = (name === 'publish' || name === 'carry');
+  $('edStats').hidden = (name === 'publish' || name === 'carry');
+  if(name === 'carry') renderCarryEditor();
   if(name === 'publish') renderPublishTab();
 }
 let lastFocus = null;
@@ -1314,8 +1455,9 @@ function initStatic(){
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('editorOverlay').hidden) closeEditor(); });
   document.querySelectorAll('#editorTabs .tab').forEach(b => b.onclick = ()=>showTab(b.dataset.tab));
 
-  $('edYear').onchange = ()=>{ edMonth.y = parseInt($('edYear').value,10); fillMonthPicker(); renderEntryRows(); if(pasteParsed) renderPastePreview(); };
+  $('edYear').onchange = ()=>{ edMonth.y = parseInt($('edYear').value,10); if(edMonth.y===0) edMonth.m = 0; else if(edMonth.y!==0 && $('edMonth').disabled && edMonth.m===0){ /* 全て のまま */ } fillMonthPicker(); renderEntryRows(); if(pasteParsed) renderPastePreview(); };
   $('edMonth').onchange = ()=>{ edMonth.m = parseInt($('edMonth').value,10); fillMonthPicker(); renderEntryRows(); if(pasteParsed) renderPastePreview(); };
+  $('edAggFilter').addEventListener('input', renderEntryRows);
   $('edCat').onchange = ()=>{ $('newCatWrap').hidden = $('edCat').value !== '__new__'; fillItemSuggestions(); if(!$('newCatWrap').hidden) $('edNewCat').focus(); };
   $('entryForm').addEventListener('submit', e => { e.preventDefault(); addEntry(); });
   $('edItem').addEventListener('input', updateItemHint);
@@ -1358,6 +1500,34 @@ function initStatic(){
     applyPaste();
   };
 
+  $('carryLabel').addEventListener('change', ()=>{ carry.label = $('carryLabel').value.trim().slice(0,20); carryChanged(); });
+  $('carryRows').addEventListener('change', e => {
+    const row = e.target.closest('[data-k]'); if(!row) return;
+    const x = carry.items[parseInt(row.dataset.k,10)]; if(!x) return;
+    if(e.target.classList.contains('c-item')){
+      const v = e.target.value.trim(); if(!v){ e.target.value = x.i; toast('項目名は空にできません'); return; } x.i = v; e.target.value = v;
+    } else if(e.target.classList.contains('c-n')){
+      const n = Number(e.target.value);
+      if(e.target.value.trim()==='' || !isFinite(n) || n < 0 || Math.round(n) !== n){ e.target.value = x.n; toast('累計は0以上の整数で入力してください'); return; }
+      x.n = n;
+    } else return;
+    carryChanged();
+  });
+  $('carryRows').addEventListener('click', e => {
+    const btn = e.target.closest('.del'); if(!btn) return;
+    const k = parseInt(btn.closest('[data-k]').dataset.k,10); const removed = carry.items.splice(k,1)[0];
+    carryChanged(); renderCarryEditor();
+    toast('削除しました：' + removed.i, '元に戻す', ()=>{ carry.items.splice(Math.min(k, carry.items.length), 0, removed); carryChanged(); renderCarryEditor(); });
+  });
+  $('carryForm').addEventListener('submit', e => {
+    e.preventDefault(); const err = $('carryError'); err.textContent = '';
+    const i = $('carryItem').value.trim(), raw = $('carryN').value.trim(), n = Number(raw);
+    if(!i){ err.textContent = '項目名を入力してください。'; return; }
+    if(raw === '' || !isFinite(n) || n < 0 || Math.round(n) !== n){ err.textContent = '累計は0以上の整数で入力してください。'; return; }
+    if(carry.items.some(x=>x.i === i)){ err.textContent = '同じ名前の項目がすでにあります。上の一覧で数値を直してください。'; return; }
+    carry.items.push({ i, n }); $('carryItem').value = ''; $('carryN').value = '';
+    carryChanged(); renderCarryEditor(); $('carryItem').focus();
+  });
   $('pubExport').onclick = exportJSON;
   $('pubImport').onclick = ()=>$('pubImportFile').click();
   $('pubImportFile').onchange = e => { const f = e.target.files[0]; if(f) importJSON(f); e.target.value = ''; };
@@ -1375,12 +1545,12 @@ function fetchPublished(){
       clearTimeout(timer);
       if(!d || !Array.isArray(d.rows) || !d.updatedAt) return;
       if(!(Date.parse(d.updatedAt) > Date.parse(seed.updatedAt))) return;   // 埋め込みより新しいものだけ採用
-      published = d;
+      published = d; if(!d.carry) d.carry = seed.carry;
       if(draftActive && draftMeta.exportedAt && draftMeta.exportedAt === d.updatedAt){
         // 書き出した内容が公開された → 下書きは不要
         clearDraft(); draftActive = false; draftMeta = { base:null, exportedAt:null };
       }
-      if(!draftActive){ rows = toRuntime(d.rows); edMonth = null; boot(); }
+      if(!draftActive){ rows = toRuntime(d.rows); carry = normCarry(d.carry); edMonth = null; boot(); }
       updateBanner();
     })
     .catch(()=>{ clearTimeout(timer); });
@@ -1392,7 +1562,7 @@ updateBanner();
 fetchPublished();
 
 // 動作確認用（画面には影響しません）
-window.__dash = { get DATA(){ return DATA; }, get rows(){ return rows; }, buildData };
+window.__dash = { get DATA(){ return DATA; }, get rows(){ return rows; }, get carry(){ return carry; }, buildData };
 })();
 </script>
 </body>

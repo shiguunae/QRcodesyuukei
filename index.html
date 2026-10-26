@@ -279,6 +279,15 @@
   .carry-edit{ display:grid; grid-template-columns:1fr 96px 38px; gap:8px; align-items:center; padding:6px 0; border-top:1px solid var(--line); }
   .carry-edit .input{ padding:7px 9px; font-size:13px; }
   .carry-edit .del{ width:38px; height:34px; border-radius:9px; border:1px solid #f0b8b3; background:#fff; color:#b42318; cursor:pointer; font-size:15px; }
+  .avg-wrap{ overflow-x:auto; margin-top:8px; }
+  .avg-table{ width:100%; border-collapse:collapse; font-size:13px; min-width:560px; }
+  .avg-table th{ text-align:right; color:var(--muted); font-size:11.5px; font-weight:600; padding:6px 8px; border-bottom:1px solid var(--card-border); white-space:nowrap; }
+  .avg-table th:first-child, .avg-table td:first-child{ text-align:left; }
+  .avg-table td{ padding:8px; border-top:1px solid var(--line); text-align:right; font-variant-numeric:tabular-nums; vertical-align:top; }
+  .avg-table td .sm{ display:block; font-size:11px; color:var(--muted); font-weight:400; }
+  .avg-table td.nm{ min-width:220px; text-align:left; } .avg-table td.av{ font-weight:800; color:var(--text); }
+  .avg-h{ font-size:14px; margin:16px 0 0; } .avg-table tr.sel td{ background:#fdf2f7; }
+  .avg-note{ font-size:12px; color:var(--muted); margin:8px 0 0; }
   .agg-filter{ margin:0 0 6px; max-width:320px; }
   .agg-row{ display:grid; grid-template-columns:1fr 120px 70px 90px; gap:8px; align-items:center; padding:7px 0; border-top:1px solid var(--line); font-size:13px; }
   .agg-row.head{ color:var(--muted); font-size:12px; border-top:0; font-weight:600; }
@@ -394,6 +403,7 @@
       <div class="seg" id="listViewSeg">
         <button class="tab active" data-view="month" type="button">月号別</button>
         <button class="tab" data-view="store" type="button">店舗別（累計）</button>
+        <button class="tab" data-view="avg" type="button">項目別の平均</button>
       </div>
       <input class="search-input" id="listSearch" type="search" placeholder="店名・QR枠名で検索">
     </div>
@@ -856,6 +866,42 @@ function renderList(){
       const anyClosed = Array.from(ds).some(d=>!d.open);
       ds.forEach(d=>d.open = anyClosed);
     };
+  } else if(listView === 'avg'){
+    const yrs = DATA.years;
+    const map = new Map();
+    rws.forEach(e => {
+      const k = e.cat + '|' + e.name;
+      if(!map.has(k)) map.set(k, { name:e.name, cat:e.cat, orig:e.item, all:{t:0,n:0}, by:{} });
+      const o = map.get(k), y = e.month.match(/(\d+)年/)[1];
+      o.all.t += e.count; o.all.n++;
+      (o.by[y] = o.by[y] || {t:0,n:0}); o.by[y].t += e.count; o.by[y].n++;
+    });
+    const av = x => x && x.n ? x.t / x.n : null;
+    const f1 = v => v === null ? '-' : (Math.round(v*10)/10).toLocaleString('ja-JP', { minimumFractionDigits:0, maximumFractionDigits:1 });
+    const list = Array.from(map.values()).sort((a,b)=>av(b.all)-av(a.all) || b.all.t-a.all.t);
+    const LIMIT = 30, shown = listShowAll ? list : list.slice(0, LIMIT);
+    // カテゴリ全体の平均（カテゴリの絞り込みに関係なく全カテゴリ）
+    const catStat = {};
+    listEntries.forEach(e => {
+      const y = e.month.match(/(\d+)年/)[1];
+      const c = (catStat[e.cat] = catStat[e.cat] || { all:{t:0,k:0,m:new Set()}, by:{} });
+      const yy = (c.by[y] = c.by[y] || {t:0,k:0,m:new Set()});
+      [c.all, yy].forEach(z => { z.t += e.count; z.k++; z.m.add(e.month); });
+    });
+    const cell = z => z ? `<td class="av">${f1(z.t/z.k)}<span class="sm">1号 ${f1(z.t/z.m.size)}（${z.m.size}号・${z.k}枠）</span></td>` : '<td>-</td>';
+    const catHtml = `<h3 class="avg-h">カテゴリ全体の平均</h3><div class="avg-wrap"><table class="avg-table"><thead><tr><th>カテゴリ</th><th>掲載号数</th><th>延べ枠数</th><th>累計</th><th>1枠あたり（全期間）</th>${yrs.map(y=>`<th>${y}年（1枠あたり）</th>`).join('')}</tr></thead><tbody>` +
+      DATA.categories.filter(c=>catStat[c]).map(c => { const o = catStat[c];
+        return `<tr${c===listCat?' class="sel"':''}><td class="nm"><span class="cat-tag"><i style="background:${catColor(c)}"></i>${esc(c)}</span></td><td>${o.all.m.size}号</td><td>${o.all.k}枠</td><td>${fmt(o.all.t)}</td>
+        <td class="av">${f1(o.all.t/o.all.k)}<span class="sm">1号 ${f1(o.all.t/o.all.m.size)}</span></td>${yrs.map(y=>cell(o.by[y])).join('')}</tr>`; }).join('') +
+      `</tbody></table></div><p class="avg-note">「1枠あたり」＝累計 ÷ 延べ枠数（1店舗・1QRを1枠と数えます）。下の小さい数字は「1号あたり」＝そのカテゴリの月合計の平均（累計 ÷ 掲載号数）です。</p>`;
+    body.innerHTML = catHtml + `<h3 class="avg-h">項目ごとの平均（同じ枠が毎月載るもの向け）</h3><div class="avg-wrap"><table class="avg-table"><thead><tr><th>項目</th><th>掲載号数</th><th>累計</th><th>平均（全期間）</th>${yrs.map(y=>`<th>${y}年の平均</th>`).join('')}</tr></thead><tbody>` +
+      shown.map(o => `<tr><td class="nm">${catTag(o.cat)}${nameBlock(o.name, o.all.n===1 ? o.orig : o.name)}</td>
+        <td>${o.all.n}号</td><td>${fmt(o.all.t)}</td><td class="av">${f1(av(o.all))}</td>
+        ${yrs.map(y => { const x = o.by[y]; return x ? `<td class="av">${f1(av(x))}<span class="sm">${x.n}号・計${fmt(x.t)}</span></td>` : '<td>-</td>'; }).join('')}</tr>`).join('') +
+      `</tbody></table></div><p class="avg-note">平均は「掲載された号ごとの読み込み数の平均」（累計 ÷ 掲載号数）です。掲載のない月は含めていません。平均の多い順に並んでいます。</p>` +
+      (list.length > LIMIT ? `<button class="more-btn" id="moreBtn" type="button">${listShowAll ? '上位'+LIMIT+'件のみ表示' : '全'+list.length+'件を表示'}</button>` : '');
+    const mb = $('moreBtn');
+    if(mb) mb.onclick = () => { listShowAll = !listShowAll; renderList(); };
   } else {
     const map = new Map();
     rws.forEach(e => {

@@ -260,6 +260,10 @@
   .editor-note{ background:#eef7fb; border:1px solid #c7e3ee; color:#124a5c; border-radius:12px; padding:10px 14px; font-size:12.5px; line-height:1.7; margin-bottom:14px; }
   .month-picker{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px 14px; background:var(--bg-soft); border:1px solid var(--card-border); border-radius:12px; margin-bottom:16px; }
   .hint{ font-size:12px; color:var(--muted); }
+  .hint b{ color:var(--text); }
+  .ed-stats{ margin:0 0 16px; }
+  .ed-stats .mini-stat .v small{ margin-left:3px; }
+  .ed-stats .mini-stat.hl{ background:#fff0f6; border-color:#f3c2d6; }
   .entry-form{ display:grid; grid-template-columns:1.1fr 1.9fr .8fr auto; gap:10px; align-items:end; }
   @media (max-width:720px){ .entry-form{ grid-template-columns:1fr 1fr; } .entry-form .field.wide{ grid-column:1 / -1; } }
   .form-error{ color:#b42318; font-size:12.5px; min-height:18px; margin-top:8px; }
@@ -435,6 +439,7 @@
       <select class="month-select" id="edMonth" aria-label="月"></select>
       <span class="hint" id="edMonthHint"></span>
     </div>
+    <div class="mini-stats ed-stats" id="edStats"></div>
 
     <!-- 入力・編集 -->
     <section id="tab-entry" class="ed-tab">
@@ -458,6 +463,7 @@
         <label for="edNewCat">新しいカテゴリ名</label>
         <input class="input" id="edNewCat" maxlength="30" placeholder="例：特集">
       </div>
+      <div class="hint" id="edItemHint" style="margin-top:8px; min-height:18px;"></div>
       <div class="form-error" id="entryError" role="alert"></div>
       <div class="ed-subhead"><b id="edMonthTitle"></b><span id="edMonthSummary"></span></div>
       <div id="edRows"></div>
@@ -1059,6 +1065,7 @@ function fillMonthPicker(){
   yEl.value = edMonth.y; mEl.value = edMonth.m;
   const exists = rows.some(r=>r.y===edMonth.y && r.m===edMonth.m);
   $('edMonthHint').textContent = exists ? 'この月のデータは入力済みです（下で編集・追加できます）' : 'この月のデータはまだありません';
+  renderEdStats();
 }
 
 function fillCategorySelect(keep){
@@ -1072,11 +1079,41 @@ function fillCategorySelect(keep){
 }
 function fillItemSuggestions(){
   const cat = $('edCat').value; const dl = $('edItemList'); dl.innerHTML = '';
+  renderEdStats();
   if(!cat || cat === '__new__') return;
   Array.from(new Set(rows.filter(r=>r.c===cat).map(r=>r.i))).slice(-400).forEach(i => { const o = document.createElement('option'); o.value = i; dl.appendChild(o); });
 }
 
 function monthRows(){ return rows.filter(r=>r.y===edMonth.y && r.m===edMonth.m); }
+
+function renderEdStats(){
+  const el = $('edStats'); if(!el || !edMonth) return;
+  const sum = list => list.reduce((s,r)=>s+r.n,0);
+  const all = sum(rows);
+  const yearRows = rows.filter(r=>r.y===edMonth.y);
+  const monthTotal = sum(monthRows());
+  const cat = $('edCat') ? $('edCat').value : '';
+  const hasCat = cat && cat !== '__new__';
+  const catRows = hasCat ? rows.filter(r=>r.c===cat) : [];
+  const monthsCount = new Set(rows.map(keyOf)).size;
+  el.innerHTML = `
+    <div class="mini-stat hl"><div class="k">全期間の累計読み込み数</div><div class="v">${fmt(all)}<small>回</small></div></div>
+    <div class="mini-stat"><div class="k">${edMonth.y}年の累計</div><div class="v">${fmt(sum(yearRows))}<small>回</small></div></div>
+    <div class="mini-stat"><div class="k">${edMonth.y}年${edMonth.m}月の合計</div><div class="v">${fmt(monthTotal)}<small>回</small></div></div>
+    <div class="mini-stat"><div class="k">${hasCat ? '「'+esc(cat)+'」の累計' : 'カテゴリ別の累計'}</div><div class="v">${hasCat ? fmt(sum(catRows)) : '-'}<small>${hasCat ? '回' : ''}</small></div></div>`;
+  updateItemHint();
+}
+function updateItemHint(){
+  const hint = $('edItemHint'); if(!hint) return;
+  const name = $('edItem').value.trim();
+  if(!name){ hint.innerHTML = ''; return; }
+  const hit = rows.filter(r=>r.i === name);
+  if(!hit.length){ hint.innerHTML = '※「' + esc(name) + '」は、これまでに登録のない新しい枠です。'; return; }
+  const total = hit.reduce((s,r)=>s+r.n,0);
+  const cats = Array.from(new Set(hit.map(r=>r.c))).join('・');
+  const last = hit.slice().sort((a,b)=>keyOf(b)-keyOf(a))[0];
+  hint.innerHTML = '「' + esc(name) + '」のこれまでの累計：<b>' + fmt(total) + '回</b>（' + hit.length + '回掲載・' + esc(cats) + '／直近 ' + labOf(keyOf(last)) + ' ' + fmt(last.n) + '回）';
+}
 function renderEntryRows(){
   const list = monthRows();
   const total = list.reduce((s,r)=>s+r.n,0);
@@ -1239,6 +1276,7 @@ function showTab(name){
   document.querySelectorAll('#editorTabs .tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
   ['entry','paste','publish'].forEach(t => { $('tab-'+t).hidden = (t !== name); });
   $('monthPickerBar').hidden = (name === 'publish');
+  $('edStats').hidden = (name === 'publish');
   if(name === 'publish') renderPublishTab();
 }
 let lastFocus = null;
@@ -1280,6 +1318,8 @@ function initStatic(){
   $('edMonth').onchange = ()=>{ edMonth.m = parseInt($('edMonth').value,10); fillMonthPicker(); renderEntryRows(); if(pasteParsed) renderPastePreview(); };
   $('edCat').onchange = ()=>{ $('newCatWrap').hidden = $('edCat').value !== '__new__'; fillItemSuggestions(); if(!$('newCatWrap').hidden) $('edNewCat').focus(); };
   $('entryForm').addEventListener('submit', e => { e.preventDefault(); addEntry(); });
+  $('edItem').addEventListener('input', updateItemHint);
+  $('edItem').addEventListener('change', updateItemHint);
 
   const host = $('edRows');
   host.addEventListener('change', e => {
